@@ -1,161 +1,161 @@
-## FundMe (Solidity + Foundry)
+# FundMe (Solidity + Foundry)
 
-**FundMe** — это минималистичный, но реалистичный пример децентрализованного краудфандинга на Ethereum.  
-Проект показывает, как с помощью Solidity, Foundry и Chainlink реализовать контракт, который:
+**FundMe** is a minimal yet realistic example of decentralized crowdfunding on Ethereum.  
+This project demonstrates how to use Solidity, Foundry, and Chainlink to build a contract that:
 
-- **принимает средства** в ETH;
-- **проверяет минимальный вклад в USD** через Chainlink price feed;
-- **позволяет только владельцу контракта** забирать собранные средства;
-- демонстрирует **газ‑оптимизированные** паттерны вывода.
+- **accepts ETH funding**;
+- **enforces a minimum USD contribution** via Chainlink price feeds;
+- **allows only the contract owner** to withdraw collected funds;
+- demonstrates **gas-optimized** withdrawal patterns.
 
-Основан на учебном курсе по разработке смарт‑контрактов от Cyfrin.
-
----
-
-## Основная идея
-
-Традиционные краудфандинговые платформы централизованы и контролируют средства пользователей.  
-**FundMe** реализует простую децентрализованную модель:
-
-- любой пользователь может профинансировать контракт ETH;
-- вклад принимается только если его стоимость \(\ge 5\) USD (по Chainlink ETH/USD);
-- владелец контракта может вывести все накопленные средства;
-- вклады и список вкладчиков отслеживаются в состоянии контракта.
+It is based on the Cyfrin smart contract development course.
 
 ---
 
-## Архитектура проекта
+## Core Idea
+
+Traditional crowdfunding platforms are centralized and control user funds.  
+**FundMe** implements a simple decentralized model:
+
+- any user can fund the contract with ETH;
+- a contribution is accepted only if its value is \(\ge 5\) USD (based on Chainlink ETH/USD);
+- the contract owner can withdraw all accumulated funds;
+- contributions and funder addresses are tracked in contract state.
+
+---
+
+## Project Architecture
 
 - `src/FundMe.sol`  
-  - основной смарт‑контракт;  
-  - хранит:
-    - `s_addressToAmountFunded` — mapping адрес → сумма вклада;
-    - `s_funders` — массив всех адресов вкладчиков;  
-  - ключевые функции:
-    - `fund()` — внести средства (с проверкой min USD);
-    - `withdraw()` — стандартный вывод средств владельцем;
-    - `cheaperWithdraw()` — газ‑оптимизированный вывод;
+  - main smart contract;  
+  - stores:
+    - `s_addressToAmountFunded` - mapping address -> funded amount;
+    - `s_funders` - array of all funder addresses;  
+  - key functions:
+    - `fund()` - contribute funds (with min USD check);
+    - `withdraw()` - standard owner-only withdrawal;
+    - `cheaperWithdraw()` - gas-optimized withdrawal;
     - `getAddressToAmountFunded`, `getFunder`, `getOwner`, `getVersion`;  
-  - `MINIMUM_USD = 5e18` — минимальный вклад в USD (через Chainlink price feed).
+  - `MINIMUM_USD = 5e18` - minimum contribution in USD (via Chainlink price feed).
 
 - `src/PriceConverter.sol`  
-  - библиотека для работы с Chainlink `AggregatorV3Interface`;  
-  - `getPrice()` — получает текущую цену ETH/USD;  
-  - `getConversionRate()` — пересчитывает `ethAmount` в USD эквивалент (18 знаков).
+  - library for Chainlink `AggregatorV3Interface`;  
+  - `getPrice()` - fetches current ETH/USD price;  
+  - `getConversionRate()` - converts `ethAmount` to USD equivalent (18 decimals).
 
 - `script/HelperConfig.s.sol`  
-  - конфиг для разных сетей:
-    - для Sepolia использует реальный ETH/USD price feed `0x694AA1769357215DE4FAC081bf1f309aDC325306`;
-    - для локальной сети (Anvil) разворачивает `MockV3Aggregator` и возвращает его адрес;  
-  - выбирает конфигурацию по `block.chainid`.
+  - network-specific configuration:
+    - uses real Sepolia ETH/USD feed `0x694AA1769357215DE4FAC081bf1f309aDC325306`;
+    - for local Anvil, deploys `MockV3Aggregator` and returns its address;  
+  - selects configuration by `block.chainid`.
 
 - `script/DeployFundMe.s.sol`  
-  - скрипт деплоя `FundMe`;  
-  - берёт активный конфиг из `HelperConfig`;  
-  - вызывает конструктор `FundMe(priceFeed)`.
+  - deployment script for `FundMe`;  
+  - gets active network config from `HelperConfig`;  
+  - calls `FundMe(priceFeed)` constructor.
 
 - `script/Interactions.s.sol`  
-  - `FundFundMe` — скрипт, который:
-    - находит **последний деплой** контракта `FundMe` через `DevOpsTools.get_most_recent_deployment`;
-    - вызывает `fund{value: 0.1 ether}()` на этом контракте;
-  - `WithdrawFundMe` — скрипт, который:
-    - находит последний деплой `FundMe`;
-    - вызывает `withdraw()` для вывода баланса владельцу.
+  - `FundFundMe` script:
+    - finds the **most recent deployment** of `FundMe` via `DevOpsTools.get_most_recent_deployment`;
+    - calls `fund{value: 0.1 ether}()` on that contract;
+  - `WithdrawFundMe` script:
+    - finds the most recent `FundMe` deployment;
+    - calls `withdraw()` to send balance to owner.
 
 - `test/FundMe.t.sol`  
-  - юнит‑тесты для контракта `FundMe`:
-    - проверка `MINIMUM_USD`;
-    - проверка владельца;
-    - проверка версии price feed;
-    - провал транзакции без достаточного ETH;
-    - обновление структуры хранения вкладов;
-    - ограничение права вывода только для владельца;
-    - сценарии вывода с одним и множеством вкладчиков (оба варианта: `withdraw` и `cheaperWithdraw`).
+  - unit tests for `FundMe`:
+    - verifies `MINIMUM_USD`;
+    - verifies owner setup;
+    - verifies price feed version;
+    - reverts when ETH sent is insufficient;
+    - updates contribution storage correctly;
+    - restricts withdrawals to owner;
+    - tests withdrawal with one and many funders (both `withdraw` and `cheaperWithdraw`).
 
 - `test/Interactions.t.sol`  
-  - интеграционный тест:
-    - деплой `FundMe`;
-    - пользователь (Karina) вносит `SEND_VALUE = 0.1 ether`;
-    - владелец выводит средства;
-    - проверяется корректность изменения балансов пользователя, владельца и контракта.
+  - integration test:
+    - deploys `FundMe`;
+    - user (Karina) funds with `SEND_VALUE = 0.1 ether`;
+    - owner withdraws funds;
+    - verifies final balances of user, owner, and contract.
 
 - `Makefile`  
-  - `build` — `forge build`;  
-  - `deploy-sepolia` — деплой в сеть Sepolia через `forge script` с верификацией на Etherscan.
+  - `build` - `forge build`;  
+  - `deploy-sepolia` - deploys to Sepolia via `forge script` and verifies on Etherscan.
 
 ---
 
-## Технологический стек
+## Tech Stack
 
-- **Solidity 0.8.x** — язык смарт‑контрактов.  
-- **Foundry** (`forge`, `cast`, `anvil`) — сборка, тестирование, локальный блокчейн.  
-- **Chainlink** — децентрализованные прайс‑фиды ETH/USD.  
-- **foundry-devops** — утилиты для работы с последними деплоями.  
-- **Makefile** — удобные команды для сборки и деплоя.
+- **Solidity 0.8.x** - smart contract language.  
+- **Foundry** (`forge`, `cast`, `anvil`) - build, test, local blockchain.  
+- **Chainlink** - decentralized ETH/USD price feeds.  
+- **foundry-devops** - utilities for working with latest deployments.  
+- **Makefile** - convenient build/deploy commands.
 
 ---
 
-## Установка и настройка
+## Installation and Setup
 
-1. **Клонировать репозиторий**
+1. **Clone repository**
 
 ```bash
-git clone <URL_ВАШЕГО_РЕПОЗИТОРИЯ> foundry-fund-me-f23
+git clone <YOUR_REPOSITORY_URL> foundry-fund-me-f23
 cd foundry-fund-me-f23
 ```
 
-2. **Установить Foundry** (если ещё не установлен)
+2. **Install Foundry** (if not installed yet)
 
 ```bash
 curl -L https://foundry.paradigm.xyz | bash
 foundryup
 ```
 
-3. **Установить зависимости (если нужно)**
+3. **Install dependencies (if needed)**
 
 ```bash
 forge install
 ```
 
-4. **Создать и заполнить `.env`**
+4. **Create and fill `.env`**
 
-Пример содержимого:
+Example:
 
 ```bash
 SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/<YOUR_INFURA_KEY>
-SEPOLIA_PRIVATE_KEY=0x<ВАШ_ПРИВАТНЫЙ_КЛЮЧ>
-ETHERSCAN_API_KEY=<ВАШ_ETHERSCAN_API_KEY>
+SEPOLIA_PRIVATE_KEY=0x<YOUR_PRIVATE_KEY>
+ETHERSCAN_API_KEY=<YOUR_ETHERSCAN_API_KEY>
 ```
 
-> **Важно:** не коммитьте приватный ключ в публичный репозиторий.
+> **Important:** never commit your private key to a public repository.
 
 ---
 
-## Основные команды
+## Main Commands
 
-Все команды выполняются из корня проекта.
+Run all commands from project root.
 
-- **Сборка контрактов**
+- **Build contracts**
 
 ```bash
 forge build
-# или
+# or
 make build
 ```
 
-- **Запуск тестов**
+- **Run tests**
 
 ```bash
 forge test
 ```
 
-С более подробным выводом:
+With more verbose output:
 
 ```bash
 forge test -vvv
 ```
 
-С отчётом по газу:
+With gas report:
 
 ```bash
 forge test --gas-report
@@ -163,58 +163,58 @@ forge test --gas-report
 
 ---
 
-## Локальная разработка (Anvil)
+## Local Development (Anvil)
 
-1. Запустить локальный узел:
+1. Start local node:
 
 ```bash
 anvil
 ```
 
-2. В другом терминале (опционально настроив RPC URL через флаг `--rpc-url`):
+2. In another terminal (optionally with `--rpc-url`):
 
 ```bash
 forge script script/DeployFundMe.s.sol:DeployFundMe \
   --rpc-url http://127.0.0.1:8545 \
-  --private-key <PRIVATE_KEY_IZ_ANVIL> \
+  --private-key <ANVIL_PRIVATE_KEY> \
   --broadcast -vvvv
 ```
 
-`HelperConfig` автоматически:
+`HelperConfig` automatically:
 
-- увидит, что сеть не Sepolia;
-- задеплоит `MockV3Aggregator`;
-- передаст его адрес в конструктор `FundMe`.
+- detects this is not Sepolia;
+- deploys `MockV3Aggregator`;
+- passes its address into `FundMe` constructor.
 
-3. Далее можно использовать скрипты взаимодействия (`Interactions.s.sol`) аналогично (см. раздел ниже).
+3. Then you can run interaction scripts (`Interactions.s.sol`) similarly (see below).
 
 ---
 
-## Деплой в Sepolia
+## Deploy to Sepolia
 
-Для деплоя в Sepolia через `Makefile` (используется `.env`):
+To deploy to Sepolia via `Makefile` (using `.env`):
 
 ```bash
 make deploy-sepolia
 ```
 
-Эта команда:
+This command:
 
-- запускает `forge script script/DeployFundMe.s.sol:DeployFundMe`;
-- использует `SEPOLIA_RPC_URL`, `SEPOLIA_PRIVATE_KEY`;
-- включает `--broadcast` и `--verify` (верификация контракта на Etherscan);
-- логирует подробный вывод (`-vvvv`).
+- runs `forge script script/DeployFundMe.s.sol:DeployFundMe`;
+- uses `SEPOLIA_RPC_URL`, `SEPOLIA_PRIVATE_KEY`;
+- enables `--broadcast` and `--verify` (Etherscan verification);
+- logs verbose output (`-vvvv`).
 
 ---
 
-## Взаимодействие с уже задеплоенным контрактом
+## Interacting with an Already Deployed Contract
 
-Скрипты в `script/Interactions.s.sol` используют `DevOpsTools.get_most_recent_deployment`, поэтому:
+Scripts in `script/Interactions.s.sol` use `DevOpsTools.get_most_recent_deployment`, so:
 
-1. Сначала сделайте деплой (`DeployFundMe`), чтобы появилась запись о последнем деплое контракта `FundMe` в текущей сети.
-2. Затем можно вызывать:
+1. First deploy (`DeployFundMe`) to create latest deployment records for current chain.
+2. Then call:
 
-- **Фандинг контракта (0.1 ETH)**
+- **Fund contract (0.1 ETH)**
 
 ```bash
 forge script script/Interactions.s.sol:FundFundMe \
@@ -223,7 +223,7 @@ forge script script/Interactions.s.sol:FundFundMe \
   --broadcast -vvvv
 ```
 
-- **Вывод средств владельцем**
+- **Withdraw funds (owner)**
 
 ```bash
 forge script script/Interactions.s.sol:WithdrawFundMe \
@@ -232,52 +232,52 @@ forge script script/Interactions.s.sol:WithdrawFundMe \
   --broadcast -vvvv
 ```
 
-Скрипты:
+Scripts will:
 
-- автоматически найдут последний деплой `FundMe` в указанной сети;
-- проведут транзакции `fund()` или `withdraw()`.
+- automatically resolve the latest `FundMe` deployment on target chain;
+- execute `fund()` or `withdraw()` transactions.
 
 ---
 
-## Поведение смарт‑контракта
+## Smart Contract Behavior
 
-- **Минимальный вклад**  
-  `fund()` делает `require(msg.value.getConversionRate(s_priceFeed) >= MINIMUM_USD)`.  
-  При попытке отправить слишком маленькую сумму транзакция ревертится с сообщением `"You need to spend more ETH!"`.
+- **Minimum contribution**  
+  `fund()` does `require(msg.value.getConversionRate(s_priceFeed) >= MINIMUM_USD)`.  
+  If the sent amount is too small, it reverts with `"You need to spend more ETH!"`.
 
-- **Учёт вкладчиков**  
-  При успешном `fund()`:
-  - `s_addressToAmountFunded[msg.sender]` увеличивается на `msg.value`;
-  - `msg.sender` добавляется в массив `s_funders`.
+- **Funder accounting**  
+  On successful `fund()`:
+  - `s_addressToAmountFunded[msg.sender]` increases by `msg.value`;
+  - `msg.sender` is added to `s_funders`.
 
-- **Вывод средств**  
-  `withdraw()` и `cheaperWithdraw()`:
+- **Withdrawals**  
+  `withdraw()` and `cheaperWithdraw()`:
 
-  - обнуляют вклады всех адресов в `s_addressToAmountFunded`;
-  - очищают массив `s_funders`;
-  - переводят весь баланс контракта на адрес владельца (`i_owner`) через низкоуровневый вызов `call`.
+  - reset all entries in `s_addressToAmountFunded`;
+  - clear `s_funders`;
+  - transfer full contract balance to owner (`i_owner`) via low-level `call`.
 
-  Разница: `cheaperWithdraw()` копирует массив в память и тем самым экономит газ.
+  Difference: `cheaperWithdraw()` copies funders array to memory to reduce gas.
 
 - **Fallback / receive**  
-  Если на контракт отправили ETH напрямую (без вызова `fund()`), сработают `receive()` или `fallback()`, которые внутри вызывают `fund()` — таким образом логика минимального вклада и учёта вкладчиков сохраняется.
+  If ETH is sent directly (without calling `fund()`), `receive()` or `fallback()` triggers and calls `fund()` internally.  
+  This preserves minimum contribution and funder accounting logic.
 
 ---
 
-## Тестирование
+## Testing
 
-В тестах используются утилиты Foundry (`vm`, `hoax`, `prank` и т.д.) для эмуляции:
+Tests use Foundry cheatcodes (`vm`, `hoax`, `prank`, etc.) to emulate:
 
-- разных отправителей;
-- начальных балансов;
-- сценариев с несколькими вкладчиками;
-- отказов по условиям.
+- different senders;
+- initial balances;
+- multi-funder scenarios;
+- expected reverts.
 
-Рекомендуется регулярно запускать:
+Recommended to run regularly:
 
 ```bash
 forge test --gas-report
 ```
 
-чтобы отслеживать влияние изменений на стоимость газа.
-
+to monitor gas impact after changes.
